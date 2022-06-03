@@ -3,7 +3,7 @@
 // @namespace    http://www.reddit.com/u/bizkut
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.9.0
+// @version      1.9.1
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
@@ -647,7 +647,11 @@ function colorAccountInfo(accountLink, extraInfo = true) {
         var hoursAgo = ($(children[2]).children("span").text());
         var lastIp = ($(children[3]).children("a").text());
         var accountAge = ($(children[4]).children("span").text());
-        var banInfo = ($(children[8]).children("span").text()); // this gives us some text on current ban
+        if (accountLink[0].href.includes('ip')){
+            var banInfo = ($(children[2]).children("span").text());
+        } else {
+            var banInfo = ($(children[8]).children("span").text()); // this gives us some text on current ban
+        }
         var muteCount = ($(children[9]).children("span").text()); // this gives us some text with the number in parentheses was 8 before
         if (extraInfo) {
             accountLink.append(" - Last Played: " + hoursAgo + " | IP: " + lastIp + " | Age: " + accountAge);
