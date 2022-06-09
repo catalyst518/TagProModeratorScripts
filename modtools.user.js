@@ -3,13 +3,13 @@
 // @namespace    http://www.reddit.com/u/bizkut
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.9.1
+// @version      1.9.2
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
 // @contributor  Carbon
 // @contributor  Catalyst
-// @include      http://tagpro-*.koalabeast.com/moderate/*
+// @include      https://tagpro-*.koalabeast.com/moderate/*
 // @include      https://tagpro.koalabeast.com/moderate/*
 // @include      http://tangent.jukejuice.com/moderate/*
 // @grant        GM_getValue
@@ -21,8 +21,6 @@
 var bizAPI = "https://kylemcgrogan.com/api/";
 var commentAPI = bizAPI + "comments/";
 var evasionAPI = bizAPI + "evasion/";
-
-var MUTE_MAX_COUNT = 10; //Dev limit
 
 var getActionURL = function(id, type, actionType) {
     return document.location.origin + '/moderate/' + type + '/' + id + '/' + actionType;
@@ -1044,8 +1042,8 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
             return;
         }
 
-        var applyMuteNext = false;
-        var multiMute = false; //Flag to detect multi-mutes which could hit the ceiling
+        //var applyMuteNext = false;
+        //var multiMute = false; //Flag to detect multi-mutes which could hit the ceiling
         actionCallback();
 
         function actionCallback() {
@@ -1057,26 +1055,12 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
                 } else if(actionType === 'unban') {
                     unbanAction(id, type, actionCallback);
                 } else if(actionType === 'unmute') {
-                    unmuteAction(id, type, actionCallback);
-                } else if (actionType === 'mute') {
-                    if(extraVariables.count < MUTE_MAX_COUNT) {
-                        multiMute = true;
-                        extraVariables.count++;
-                        muteAction(id, type, actionCallback);
-                    } else if (extraVariables.count == MUTE_MAX_COUNT && multiMute) {
-                        extraVariables.count++;
-                        actionCallback();
-                    } else if (extraVariables.count == MUTE_MAX_COUNT) {
-                        actionAmount++;
-                        applyMuteNext = true; //Force mute next time round
-                        extraVariables.count++;
+                    if (extraVariables.count>0) {
+                        extraVariables.count--
                         unmuteAction(id, type, actionCallback);
-                    } else if (applyMuteNext) {
-                        applyMuteNext = false;
-                        muteAction(id, type, actionCallback);
-                    } else { // When extraVariables.count > MUTE_MAX_COUNT, we do nothing but loop again
-                        actionCallback();
                     }
+                } else if (actionType === 'mute') {
+                    muteAction(id, type, actionCallback);
                 }
             }
         }
@@ -1156,7 +1140,7 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
         unmuteButton.insertAfter(muteButton)
         $("#unmuteButton").on('click', function(e) {
             disableButton("unmuteButton");
-            applyAction(e, profId, section, 'unmute', $("#muteAmount").val(), {})
+            applyAction(e, profId, section, 'unmute', $("#muteAmount").val(), {count:muteCount})
             waitForZeroActiveRequestsThenRefresh();
         });
         $("#modcallMuteButton").insertAfter($("#unmuteButton"))
