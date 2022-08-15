@@ -3,7 +3,7 @@
 // @namespace    http://www.reddit.com/u/bizkut
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.9.2
+// @version      1.9.3
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
@@ -520,60 +520,6 @@ function setMod() {
 }
 setMod();
 
-function bindReason(e) {
-    var t = moderate.kickReasons["" + e];
-    return t ? t.text : ""
-}
-function bindPlayerName(e) {
-    return e ? e.reservedName : ""
-}
-
-function bindSince(e) {
-    return e ? moment(e).format("MMMM D YYYY h:mm:ss A") : "-"
-}
-
-function bindDate(e) {
-    return moment(e).format("LLL")
-}
-
-function bindChatTo(e) {
-    switch (e) {
-        case 1:
-            return "All";
-        case 2:
-            return "Team";
-        case 3:
-            return "Mod";
-        default:
-            return ""
-    }
-}
-
-function bindUserId(e) {
-    return e ? e : ""
-}
-
-function bindGameState(e) {
-    switch (e) {
-        case 1:
-            return "In Progress";
-        case 2:
-            return "Completed";
-        case 3:
-            return "Starting";
-        default:
-            return "I Dunno"
-    }
-}
-
-function bindBool(e) {
-    return e ? "Yes" : "No"
-}
-
-function bindValue(e) {
-    return e ? e : ""
-}
-
 /**
  * On any of the moderation tables where we display a bunch of rows
  * this function will make it display a row explaining there were no responses
@@ -726,152 +672,31 @@ if (window.location.pathname.indexOf("reports") > -1) {
         }
     });
 
-    moderate.smartBind = function smartBind($template, data) {
-        var games = {};
-        function bind($template, obj) {
-            var $result = $template.clone();
-            return $result.find("[data-bind]").each(function() {
-                var property = $(this).attr("data-bind"),
-                    format = $(this).attr("data-format"),
-                    filterProperty = $(this).attr("data-filter-bind"),
-                    value = null;
-                eval("value = obj." + property);
-                if(property === "gameId") {
-                    games[value] = games[value]? games[value]+1 : 1;
-                }
-                if (filterProperty) {
-                    var filterValue = null;
-                    value && eval("filterValue = value." + filterProperty), $(this).attr("data-filter-value", filterValue)
-                }
-                if (format) {
-                    var func = null;
-                    eval("func = " + format), value = func(value)
-                }
-                if (GM_getValue("hideSystem")===true) {
-                    if (property == "byIP" && value == null) {
-                        $(this.parentNode.parentNode).css("display", "none")
+    moderate.oldBind2 = moderate.smartBind;
+    moderate.smartBind = function($template, data) {
+        var rows = moderate.oldBind2($template, data);
+        if (Array.isArray(rows)) {
+            rows.forEach(function(element) {
+                if (GM_getValue("hideSystem") === true) {
+                    var ip = $(element).find("[data-bind=byIP]").text();
+                    if (ip.includes("null")) {
+                        $(element).css("display", "none");
                         return;
                     }
                 }
-                $(this).text(value)
-            }), $result.find("button[data-link]").each(function() {
-                var e = "chat?",
-                    t = $(this),
-                    n = t.parents("tr:first"),
-                    r = $(this).attr("data-params").split(" ").map(function(e) {
-                        var t = n.find("[data-bind=" + e + "]"),
-                            r = t.attr("data-filter-value") ? t.attr("data-filter-value") : t.text();
-                        return e + "=" + r
-                    }).join("&");
-                t.attr("data-link", e + r)
-            }), $result.find("a[data-link]").each(function() {
-                var e = "chat?",
-                    t = $(this),
-                    n = t.parents("tr:first"),
-                    r = $(this).attr("data-params").split(" ").map(function(e) {
-                        var t = n.find("[data-bind=" + e + "]"),
-                            r = t.attr("data-filter-value") ? t.attr("data-filter-value") : t.text();
-                        return e + "=" + r
-                    }).join("&");
-                t.attr("href", e + r)
-            }), $result.find("[data-if]").each(function() {
-                var property = $(this).attr("data-if"),
-                    value = null;
-                try {
-                    eval("value = obj." + property)
-                } catch (e) {}
-                if (!value) return $(this).remove();
-                $(this).attr("href", $(this).attr("href").replace(/{value}/g, value))
-            }), $result.find("[data-strike-if]").each(function() {
-                var property = $(this).attr("data-strike-if"),
-                    value = null;
-                try {
-                    eval("value = obj." + property)
-                } catch (e) {}
-                if (value) return $(this).css("text-decoration", "line-through")
-                    }), $result
+
+                var gameReports = $(element).find("[data-bind=gameReports]");
+                if (gameReports && parseInt(gameReports.text()) > 2) {
+                    gameReports.parent("th").css("color", "red");
+                }
+            });
         }
 
-        var rows = Array.isArray(data) ? data.map(function(e) {
-            return bind($template, e)
-        }) : bind($template, data);
-        rows.forEach(function(element) {
-            var text = $(element).children()[6].innerText;
-            if(games[text] > 2) {
-                $($(element).children()[6]).prepend("("+games[text]+") ").css({'color':'red'});
-            }
-        });
         return rows;
     };
 }
 
 if(window.location.pathname.indexOf('chat') > -1) {
-    moderate.smartBind = function smartBind($template, data) {
-        function bind($template, obj) {
-            var $result = $template.clone();
-            return $result.find("[data-bind]").each(function() {
-                var property = $(this).attr("data-bind"),
-                    format = $(this).attr("data-format"),
-                    filterProperty = $(this).attr("data-filter-bind"),
-                    value = null;
-                eval("value = obj." + property);
-                if (filterProperty) {
-                    var filterValue = null;
-                    value && eval("filterValue = value." + filterProperty), $(this).attr("data-filter-value", filterValue)
-                }
-                if (format) {
-                    var func = null;
-                    eval("func = " + format), value = func(value)
-                }
-                $(this).text(value)
-            }), $result.find("button[data-link]").each(function() {
-                var e = "chat?",
-                    t = $(this),
-                    n = t.parents("tr:first"),
-                    r = $(this).attr("data-params").split(" ").map(function(e) {
-                        var t = n.find("[data-bind=" + e + "]"),
-                            r = t.attr("data-filter-value") ? t.attr("data-filter-value") : t.text();
-                        return e + "=" + r
-                    }).join("&");
-                t.attr("data-link", e + r)
-            }), $result.find("a[data-link]").each(function() {
-                var e = "chat?",
-                    t = $(this),
-                    n = t.parents("tr:first"),
-                    r = $(this).attr("data-params").split(" ").map(function(e) {
-                        var t = n.find("[data-bind=" + e + "]"),
-                            r = t.attr("data-filter-value") ? t.attr("data-filter-value") : t.text();
-                        return e + "=" + r
-                    }).join("&");
-                t.attr("href", e + r)
-            }), $result.find("[data-if]").each(function() {
-                var property = $(this).attr("data-if"),
-                    value = null;
-                try {
-                    eval("value = obj." + property)
-                } catch (e) {}
-                if (!value) return $(this).remove();
-                $(this).attr("href", $(this).attr("href").replace(/{value}/g, value))
-            }), $result.find("[data-strike-if]").each(function() {
-                var property = $(this).attr("data-strike-if"),
-                    value = null;
-                try {
-                    eval("value = obj." + property)
-                } catch (e) {}
-                if (value) return $(this).css("text-decoration", "line-through")
-                    }), $result
-        }
-        return Array.isArray(data) ? data.map(function(e) {
-            return bind($template, e)
-        }) : bind($template, data)
-    };
-    function bindDate(e) {
-        if (GM_getValue('longTime') === true) {
-            return moment(e).format("MMMM D YYYY h:mm:ss A");
-        } else {
-            return moment(e).format("LLL");
-        }
-    }
     $('#reportRows').on('click', 'th', function() {
         var $this = $(this);
         if ($this.parent().children()[6] != this) { return; }
