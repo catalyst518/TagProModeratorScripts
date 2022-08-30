@@ -4,7 +4,7 @@
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 // @downloadURL  https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.10.0
+// @version      1.10.1
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
@@ -398,11 +398,11 @@ var evasionSection = function() {
         evasionSection.append(evasionAccounts);
         $('form').before(evasionSection);
 
+        var lastIP = '';
         if (isProfile) {
             lastIP = $('label:contains("Last IP")').next().text();
-        } else {
-            lastIP = pageId;
         }
+        lastIP = lastIP || pageId;
 
         $.get(evasionAPI + "suspicious/" + lastIP, {}, function(response) {
             if (response[2] || response[3]) {
