@@ -625,7 +625,7 @@ function colorAccountInfo(accountLink, extraInfo = true) {
         accountLink.attr('data-bancount', banCount);
 
         // Orange/Cyan added for new accounts by Ballzilla
-        if (banInfo.length && !banInfo.includes("No")) {
+        if (banInfo.length && !banInfo.includes("No ")) {
             accountLink.append(" (This user is currently banned)");
             if(hoursAgeAsFloat <= newAcntHours) {
                 accountLink.css({
