@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         Mod Tools Helper - Beta
+// @name         Mod Tools Helper
 // @namespace    http://www.reddit.com/u/bizkut
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 // @downloadURL  https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.10.1
+// @version      1.11.0
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
@@ -314,7 +314,7 @@ var evasionSection = function() {
 
                 banProfile.profiles.forEach(function(profile, i, a) {
                     var link = $("<a class='ban_profile_account' href='//" + window.location.hostname + "/moderate/users/" + profile.profile_id +"'>" + profile.profile_id +"</a>");
-                    var removeAccount = $("<span class='removeAccount' data-id='"+profile.id+"'> ✗</span>");
+                    var removeAccount = $("<span class='removeAccount ipchecked' data-id='"+profile.id+"'> ✗</span>");
                     accountBanList.push({
                         id: profile.profile_id,
                         type: 'users',
@@ -335,7 +335,7 @@ var evasionSection = function() {
 
                 var ipList = $("<ul class='indent'/>");
                 banProfile.ranges.forEach(function(ip, i, a) {
-                    var link = $("<a class='ban_profile_ip ipchecked' href='//" + window.location.hostname + "/moderate/ips/" + ip.tagpro +"'>" + ip.tagpro +"</a>");
+                    var link = $("<a class='ban_profile_ip' href='//" + window.location.hostname + "/moderate/ips/" + ip.tagpro +"'>" + ip.tagpro +"</a>");
                     var removeIP = $("<span class='removeIP ipchecked' data-id='"+ip.id+"'> ✗</span>");
                     accountBanList.push({
                         id: ip.tagpro,
@@ -411,7 +411,7 @@ var evasionSection = function() {
                 if (response[3]) {
                     var ipList = $("<ul class='indent' />");
                     response[3].forEach(function(item) {
-                        ipList.append("<li class='indent'><a class='ipchecked' href='//" + window.location.hostname + "/moderate/ips/" + item +"'>" + item +"</a></li>" );
+                        ipList.append("<li class='indent'><a href='//" + window.location.hostname + "/moderate/ips/" + item +"'>" + item +"</a></li>" );
                     });
                     ipList.prepend("<h2>Very Similar</h2>");
                     suspiciousSection.append(ipList);
@@ -420,7 +420,7 @@ var evasionSection = function() {
                 if (response[2]) {
                     var ipList = $("<ul class='indent' />");
                     response[2].forEach(function(item) {
-                        ipList.append("<li class='indent'><a class='ipchecked' href='//" + window.location.hostname + "/moderate/ips/" + item +"'>" + item +"</a></li>" );
+                        ipList.append("<li class='indent'><a href='//" + window.location.hostname + "/moderate/ips/" + item +"'>" + item +"</a></li>" );
                     });
                     ipList.prepend("<h2>Somewhat Similar</h2>");
                     suspiciousSection.append(ipList);
@@ -625,7 +625,7 @@ function colorAccountInfo(accountLink, extraInfo = true) {
         accountLink.attr('data-bancount', banCount);
 
         // Orange/Cyan added for new accounts by Ballzilla
-        if (banInfo.length && !banInfo.includes("No")) {
+        if (banInfo.length && !banInfo.includes("No ")) {
             accountLink.append(" (This user is currently banned)");
             if(hoursAgeAsFloat <= newAcntHours) {
                 accountLink.css({
@@ -650,6 +650,7 @@ function colorAccountInfo(accountLink, extraInfo = true) {
                 'color': 'green'
             });
         }
+        accountLink.addClass('highlightPending')
     });
 }
 
@@ -1107,53 +1108,89 @@ function updateRecentReportsHeader(activeReportCounter) {
 // inject custom style for highlighting of ips
 $('head').append('<style> .highlight { text-decoration: underline !important; color: red !important; } </style>');
 
+function octetExistenceCheck(unsplitIpToCheck) {
+    var ipToCheck = unsplitIpToCheck.split('.')
+    if (!highRiskIpsTreeMap
+           .has(ipToCheck[0])) {
+        return "";
+    }
+    if (!highRiskIpsTreeMap.get(ipToCheck[0])
+           .has(ipToCheck[1])) {
+        return ipToCheck[0] + '.';
+    }
+    if (!highRiskIpsTreeMap.get(ipToCheck[0]).get(ipToCheck[1])
+           .has(ipToCheck[2])) {
+        return ipToCheck[0] + '.' + ipToCheck[1] + '.';
+    }
+    if (!highRiskIpsTreeMap.get(ipToCheck[0]).get(ipToCheck[1]).get(ipToCheck[2])
+           .has(ipToCheck[3])) {
+        return ipToCheck[0] + '.' + ipToCheck[1] + '.' + ipToCheck[2] + '.';
+    }
+    return unsplitIpToCheck;
+}
+
 // custom jquery function to search elements and highlight parts of the ip matching high risk ips
 jQuery.fn.highlightRisk = function() {
-    var node = this[0], bestMatch = null, bestLength = null;
+    var node = this[0]
 
-    // for each ip found on the page we need to check against every high risk ip and identifier the ip that matches best
-    $.each(highRiskIPs, function(index, ip) {
-        ip = ip.split('.');
+    var hasExtraInfo = false;
+    var ipStringIndexStart, ipStringIndexEnd;
+    
+    var unsplitIpToCheck = node.data;
 
-        var regex = new RegExp('\\b' + ip[0] + '\\.' + ip[1] + '(?=\\.\\d+\\.\\d+)(\\.' + ip[2] + '(?=\\.\\d+)(\.' + ip[3] + ')?)?', 'i');
-        var match = regex.exec(node.data);
+    if (node.data.includes("IP: ")) {
+        hasExtraInfo = true //requires extra logic to highlight the correct part
+        ipStringIndexStart = node.data.indexOf("IP:") + 4
+        ipStringIndexEnd = node.data.indexOf("Age") - 3
+        unsplitIpToCheck = unsplitIpToCheck.substring(ipStringIndexStart, ipStringIndexEnd)
+    }
 
-        if (match != null) {
-            if (bestMatch == null) {
-                bestMatch = regex;
-                bestLength = match[0].length;
-            } else {
-                if (bestLength < match[0].length) {
-                    bestMatch = regex;
-                    bestLength = match[0].length;
-                }
-            }
-        }
-    });
+    var toHighlightString = octetExistenceCheck(unsplitIpToCheck);
 
-    // use the best matching high risk ip and highlight the matching sections of the ip being checked
-    if (bestMatch != null) {
-        var pos = node.data.search(bestMatch);
-        var match = node.data.match(bestMatch);
+    // if ipToCheck's octets matched any in the high risk list, we highlight the maximum number of matched octets
+    if (toHighlightString.length > 0) {
         var spanNode = document.createElement('span');
-
-        // since our highlighting is wrapped in a span we must add ipchecked to it so it doesn't get picked up as an unchecked element next interval
         spanNode.className = 'highlight ipchecked';
 
-        var middleBit = node.splitText(pos);
-        var endBit = middleBit.splitText(match[0].length);
-        var middleClone = middleBit.cloneNode(true);
-
-        spanNode.appendChild(middleClone);
-        middleBit.parentNode.replaceChild(spanNode, middleBit);
+        if (hasExtraInfo) {
+            var unhighlightedSection = node.splitText(ipStringIndexStart).splitText(toHighlightString.length);
+            spanNode.textContent = toHighlightString
+            unhighlightedSection.parentNode.replaceChild(spanNode, unhighlightedSection.parentNode.childNodes[2])
+        } else {
+            var unhighlightedSection = node.splitText(toHighlightString.length);
+            spanNode.textContent = node.data
+            unhighlightedSection.parentNode.replaceChild(spanNode, unhighlightedSection.parentNode.childNodes[0])
+        }
     }
 };
+
+function jsonToTreeMap(highRiskIps) {
+    treeMap = new Map()
+
+    for (const ip of new Set(highRiskIps)) {
+        octets = ip.split('.')
+        if (!treeMap.has(octets[0])) {
+            treeMap.set(octets[0], new Map())
+        }
+        if (!treeMap.get(octets[0]).has(octets[1])) {
+            treeMap.get(octets[0]).set(octets[1], new Map())
+        }
+        if (!treeMap.get(octets[0]).get(octets[1]).has(octets[2])) {
+            treeMap.get(octets[0]).get(octets[1]).set(octets[2], new Map())
+        }
+        if (!treeMap.get(octets[0]).get(octets[1]).get(octets[2]).has(octets[3])) {
+            treeMap.get(octets[0]).get(octets[1]).get(octets[2]).set(octets[3], new Map())
+        }
+    }
+    return treeMap;
+}
 
 // Grab the list of High Risk IPs
 $.get(evasionAPI + 'evaders', function(response) {
     highRiskIPs = JSON.parse(response);
+    highRiskIpsTreeMap = jsonToTreeMap(highRiskIPs)
 
-    // 1 second interval to check for new ips to match against
+    // 0.1 second interval to check for new ips to match against
     setInterval(function() {
         $('a, span').not('.ipchecked').contents().each(function() {
             // set this element as checked so its not checked again; we must use parent because .contents() pulls the text node (nodeType 3) not the element that contains the text
@@ -1165,8 +1202,26 @@ $.get(evasionAPI + 'evaders', function(response) {
                 }, 0, this);
             }
         });
-    }, 1000);
+    }, 100);
 });
+
+/*
+  When there are many evasion profiles, it can take a long time to load all of the extra info (importantly, the ip address). The normal highlightRisk loop is not sufficient
+  in this case as it marks the node as "ipchecked" before the ip has actually been checked and highlighted.
+  We therefore perform the same logic on a periodic loop (2.5s) for evasion info which loads late.
+*/
+setInterval(function() {
+    $('.highlightPending').contents().each(function() {
+        // set this element as checked so its not checked again; we must use parent because .contents() pulls the text node (nodeType 3) not the element that contains the text
+        $(this).parent().removeClass('highlightPending');
+
+        if ($(this)[0].nodeType == 3 && $(this)[0].length > 0 && /\d+\.\d+\.\d+\.\d+/.test($(this)[0].nodeValue)) {
+            setTimeout(function(ele) {
+                $(ele).highlightRisk();
+            }, 0, this);
+        }
+    });
+}, 2500);
 
 var sortUserLastGame = function(ascOrDesc) {
     var userRows = $('tr');
