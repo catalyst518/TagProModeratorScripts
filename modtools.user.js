@@ -1215,7 +1215,7 @@ setInterval(function() {
         // set this element as checked so its not checked again; we must use parent because .contents() pulls the text node (nodeType 3) not the element that contains the text
         $(this).parent().removeClass('highlightPending');
 
-        if ($(this)[0].nodeType == 3 && $(this)[0].length > 0) {
+        if ($(this)[0].nodeType == 3 && $(this)[0].length > 0 && /\d+\.\d+\.\d+\.\d+/.test($(this)[0].nodeValue)) {
             setTimeout(function(ele) {
                 $(ele).highlightRisk();
             }, 0, this);
