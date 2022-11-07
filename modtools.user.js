@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         Mod Tools Helper
+// @name         Mod Tools Helper - Beta
 // @namespace    http://www.reddit.com/u/bizkut
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 // @downloadURL  https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.11.0
+// @version      1.11.1
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
