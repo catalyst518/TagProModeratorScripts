@@ -4,7 +4,7 @@
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 // @downloadURL  https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.11.1
+// @version      1.12.1
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
@@ -27,15 +27,26 @@ var getActionURL = function(id, type, actionType) {
     return document.location.origin + '/moderate/' + type + '/' + id + '/' + actionType;
 }
 
-var banAction = function(id, type, count, reason, callback) {
+var banAction = function(id, type, count, reason, bansApplied) {
     $.post(getActionURL(id, type, 'ban'), {
         reason: reason,
-        banCount: count
-    }, callback);
+        banCount: count,
+        bansApplied: bansApplied
+    }, function (data) {
+            if (!data) return;
+            if (data.alert) alert(data.alert);
+            location.reload();
+        } );
 }
 
-var unbanAction = function(id, type, callback) {
-    $.post(getActionURL(id, type, 'unban'), callback);
+var unbanAction = function(id, type, bansRemoved) {
+    $.post(getActionURL(id, type, 'unban'), {
+        bansRemoved: bansRemoved
+    }, function (data) {
+            if (!data) return;
+            if (data.alert) alert(data.alert);
+            location.reload();
+        } );
 }
 
 var muteAction = function(id, type, callback) {
@@ -254,8 +265,8 @@ var evasionSection = function() {
                     var numActionsToApply = 0;
                     if(actionType === "ban") {
                         currentBanCount = profile.el.attr('data-bancount')
-                        numActionsToApply = mainProfileBanCount - currentBanCount;
-                        extraVariables = {
+                        numActionsToApply = Math.max(mainProfileBanCount - currentBanCount, 0);
+                        var extraVariables = {
                             sync:   true,
                             reason: banEvasionReason, //hardcode to ban evasion
                             count:  currentBanCount
@@ -276,14 +287,12 @@ var evasionSection = function() {
             function singleEvasionAction(actionType) {
                 var total = accountBanList.length;
                 var current = total;
-                setEvasionProfileHeader(total, total, actionType);
 
                 accountBanList.forEach(function(profile) {
-                    setEvasionProfileHeader(total, --current, actionType);
 
                     //setting up extraVariables. Not required for un-X actions, but doesn't hurt.
                     if(actionType.indexOf("ban") > -1) {
-                        extraVariables = {
+                        var extraVariables = {
                             sync:   false,
                             reason: banEvasionReason,
                             count:  profile.el.attr('data-bancount')
@@ -303,8 +312,6 @@ var evasionSection = function() {
 
             evasionAccount.append(evasionBanButton);
             evasionAccount.append(evasionUnbanButton);
-            evasionAccount.append(evasionMuteButton);
-            evasionAccount.append(evasionUnmuteButton);
             evasionAccount.append(syncText);
             evasionAccount.append(syncSwitch);
             if (banProfile.profiles.length > 0) {
@@ -605,8 +612,8 @@ function colorAccountInfo(accountLink, extraInfo = true) {
         var banCount = $(data).find("#banCount").val();
         var realBanCount = getActualBanCount($(data).find("div"));
 
-        if (banCount < realBanCount) { //community bans mean we can't be sure when displayed>real
-            accountLink.append(" | Bans: " + banCount + " [" + realBanCount + "]");
+        if (banCount) { //community bans mean we can't be sure when displayed>real
+            accountLink.append(" | Bans: " + banCount);
         } else {
             accountLink.append(" | Bans: " + banCount);
         }
@@ -861,7 +868,47 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
         }
     }
 
+    if(profId !== 'users') {
+        $("<h2 id='comment_title'>Comments</h2>").appendTo("#content");
+
+        $.get(commentAPI + "comment/"+profId, function (data) {
+            $(data).insertAfter("#comment_title");
+
+            $("<textarea id='comment_box' />").insertAfter($('#comments'));
+
+            var makeComment = $("<button id='submitComment' class='tiny'>Submit</button>");
+            var cancelComment = $("<button id='cancelComment' class='tiny'>Cancel</button>")
+            var commented = false;
+            makeComment.on('click', function() {
+                var text = $("#comment_box").val();
+                if($.trim(text).length !== 0) {
+                    if(commented === false) {
+                        commented = true;
+                        if (GM_getValue('mod_username') !== undefined) {
+                            $.post( commentAPI + "comment", { profile: profId, comment: text, modName: GM_getValue('mod_username') })
+                                .done(function( data ) {
+                                location.reload();
+                            });
+                        } else {
+                            alert("Hmm, I can't find your username to post with :(");
+                        }
+                    } else {
+                        alert("You already clicked comment once u dink");
+                    }
+                }
+            });
+            cancelComment.on('click', function() {
+                $("#comment_box").val("");
+            });
+
+            makeComment.insertAfter($("#comment_box"));
+            cancelComment.insertAfter(makeComment);
+            $("<br/>").insertBefore(makeComment);
+        });
+    }
+
     function applyAction(e, id, type, actionType, actionAmount, extraVariables) {
+
         if(e != null) {
             e.preventDefault();
         }
@@ -869,109 +916,16 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
             return;
         }
 
-        //var applyMuteNext = false;
-        //var multiMute = false; //Flag to detect multi-mutes which could hit the ceiling
-        actionCallback();
+        var increment = actionAmount;
 
-        function actionCallback() {
-            if (actionAmount > 0) {
-                actionAmount--;
-
-                if (actionType === 'ban') {
-                    banAction(id, type, extraVariables.count++, extraVariables.reason, actionCallback)
-                } else if(actionType === 'unban') {
-                    unbanAction(id, type, actionCallback);
-                } else if(actionType === 'unmute') {
-                    if (extraVariables.count>0) {
-                        extraVariables.count--
-                        unmuteAction(id, type, actionCallback);
-                    }
-                } else if (actionType === 'mute') {
-                    muteAction(id, type, actionCallback);
-                }
-            }
+        if (actionType === 'ban') {
+            banAction(id, type, extraVariables.count, extraVariables.reason, increment);
+        } else if(actionType === 'unban') {
+            unbanAction(id, type, increment);
         }
-    }
-
-    var selectCopy = $("#banSelect").clone();
-    selectCopy.attr('id', "banCopy");
-    var prevChild = $("#banSelect").prev();
-    $("#banSelect").remove();
-    prevChild.after(selectCopy);
-
-    $("#unbanButton").remove();
-    var unban = $("<button id='unbanButton' class='tiny'>Unban</button>");
-    if ($("#muteButton").length) {
-       prevChild.parent().prev().prev().prev().prev().append(unban);
-    }
-    else {
-        prevChild.parent().prev().append(unban);
     }
 
     var currentBanCount = $("#banCount").val();
-    var select = $("<select id = 'removeCount'/>");
-    var error = null;
-    for(var i=1; i<= currentBanCount;i++) {
-        $("<option />", {value: i, text: i}).appendTo(select);
-    }
-    select.appendTo(unban.prev());
-    $("#unbanButton").off('click');
-
-    $("#unbanButton").on('click.bizkut', function(e) {
-        disableButton("unbanButton");
-        applyAction(e, profId, section, 'unban', $("#removeCount").val(), {})
-        waitForZeroActiveRequestsThenRefresh();
-    });
-
-    var banAmount = $("<select id='banAmount' />");
-    for(var x = 1;x<=10;x++) {
-        $("<option />", {value: x, text: x}).appendTo(banAmount);
-    }
-
-    prevChild.parent().append(banAmount);
-
-    var submitBan = $("<button id='submitBan' class='tiny'>BAN EM</button>");
-    var banClicked = false;
-    submitBan.on('click', function(e) {
-        disableButton("submitBan");
-        extraVariables = {
-            reason: $("#banCopy").val(),
-            count:  currentBanCount
-        }
-        applyAction(e, profId, section, 'ban', $("#banAmount").val(), extraVariables)
-        waitForZeroActiveRequestsThenRefresh();
-    });
-    prevChild.parent().append(submitBan);
-
-    if ($("#muteButton").length) { //mute doesn't appear on IP pages, so we check for existence
-        var muteAmount = $("<select id='muteAmount' />");
-        for(var x = 1;x<=10;x++) {
-            $("<option />", {value: x, text: x}).appendTo(muteAmount);
-        }
-        muteAmount.insertBefore($("#muteButton"))
-
-        var muteCount = $("#muteAmount").prev()[0].innerText.match(/\(([^)]+)\)/)[1]; //Don't have the luxury of banCount just existing
-
-        $("#muteButton").remove()
-        $("#unmuteButton").remove()
-
-        var muteButton = $("<button id='muteButton' class='tiny'>MuteX</button>");
-        muteButton.insertAfter(muteAmount)
-        $("#muteButton").on('click', function(e) {
-            disableButton("muteButton");
-            applyAction(e, profId, section, 'mute', $("#muteAmount").val(), {count:muteCount})
-            waitForZeroActiveRequestsThenRefresh();
-        });
-
-        var unmuteButton = $("<button id='unmuteButton' class='tiny'>UnmuteX</button>");
-        unmuteButton.insertAfter(muteButton)
-        $("#unmuteButton").on('click', function(e) {
-            disableButton("unmuteButton");
-            applyAction(e, profId, section, 'unmute', $("#muteAmount").val(), {count:muteCount})
-            waitForZeroActiveRequestsThenRefresh();
-        });
-        $("#modcallMuteButton").insertAfter($("#unmuteButton"))
-    }
 
     function getIPInfo(ip) {
         GM_xmlhttpRequest({
@@ -1013,44 +967,7 @@ if(window.location.pathname.indexOf('users') > -1 || window.location.pathname.in
     });
     $('label:contains("'+ (section == 'users' ? 'Last IP' : 'IP Address') +'")').parent().append(ipCheck);
 
-    if(profId !== 'users') {
-        $("<h2 id='comment_title'>Comments</h2>").appendTo("#content");
-
-        $.get(commentAPI + "comment/"+profId, function (data) {
-            $(data).insertAfter("#comment_title");
-
-            $("<textarea id='comment_box' />").insertAfter($('#comments'));
-
-            var makeComment = $("<button id='submitComment' class='tiny'>Submit</button>");
-            var cancelComment = $("<button id='cancelComment' class='tiny'>Cancel</button>")
-            var commented = false;
-            makeComment.on('click', function() {
-                var text = $("#comment_box").val();
-                if($.trim(text).length !== 0) {
-                    if(commented === false) {
-                        commented = true;
-                        if (GM_getValue('mod_username') !== undefined) {
-                            $.post( commentAPI + "comment", { profile: profId, comment: text, modName: GM_getValue('mod_username') })
-                                .done(function( data ) {
-                                location.reload();
-                            });
-                        } else {
-                            alert("Hmm, I can't find your username to post with :(");
-                        }
-                    } else {
-                        alert("You already clicked comment once u dink");
-                    }
-                }
-            });
-            cancelComment.on('click', function() {
-                $("#comment_box").val("");
-            });
-
-            makeComment.insertAfter($("#comment_box"));
-            cancelComment.insertAfter(makeComment);
-            $("<br/>").insertBefore(makeComment);
-        });
-    }
+    //here
 }
 
 function setActiveCountOnRecentReports(optionEnabled) {
@@ -1135,7 +1052,7 @@ jQuery.fn.highlightRisk = function() {
 
     var hasExtraInfo = false;
     var ipStringIndexStart, ipStringIndexEnd;
-    
+
     var unsplitIpToCheck = node.data;
 
     if (node.data.includes("IP: ")) {
