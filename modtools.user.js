@@ -4,7 +4,7 @@
 // @updateURL    https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 // @downloadURL  https://github.com/catalyst518/TagProModeratorScripts/raw/master/modtools.user.js
 
-// @version      1.11.1
+// @version      1.12.1
 // @description  It does a lot.  And then some.  I'm not even joking.  It does too much.
 // @author       Bizkut
 // @contributor  OmicroN
